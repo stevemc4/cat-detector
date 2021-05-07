@@ -1,54 +1,87 @@
 import '@tensorflow/tfjs-backend-cpu'
 import '@tensorflow/tfjs-backend-webgl'
 
-import React, { useEffect, useState, createRef } from 'react'
-import styled from 'styled-components'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
+import styled, { css } from 'styled-components'
 import * as cocoSsd from '@tensorflow-models/coco-ssd'
 
 const Container = styled.div`
   max-width: 960px;
   margin: 0px auto;
-  padding: 16px;
   box-sizing: border-box;
   min-height: 100vh;
 `
 
 const FeedContainer = styled.div`
-  width: 100%;
-  height: 0px;
-  padding-top: 177%;
-  background: #2d2d2d;
-  border-radius: 4px;
+  width: 100vw;
+  height: 100vh;
+  max-width: 960px;
+  background: #2d2d2d
   position: relative;
 
   video {
-    position: absolute;
     width: 100%;
     height: 100%;
-    top: 0px;
-    left: 0px;
-    border-radius: 4px;
     object-fit: cover;
   }
 `
-let model: cocoSsd.ObjectDetection | null = null
+
+const CatStatus = styled.div`
+  position: fixed;
+  bottom: 0px;
+  left: 0px;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+`
+
+const CatLabel = styled.span`
+  display: block;
+  padding: 16px 24px;
+  border-radius: 4px;
+  font-weight: bold;
+  background: #fff;
+  color: #2d2d2d;
+  font-size: 18px;
+  margin-left: 8px;
+
+  &:first-child {
+    margin-left: 0px;
+  }
+`
+
+interface CatConfirmationProps {
+  isOK: boolean
+}
+
+const CatConfirmation = styled(CatLabel)<CatConfirmationProps>`
+  background-color: #ff5555;
+  color: #fff;
+
+  ${(props) => props.isOK && css`
+    background-color: #25bb37;
+  `}
+`
 
 const Index = (): React.ReactElement => {
-  const videoRef = createRef<HTMLVideoElement>()
-  const [currentDetected, setCurrentDetected] = useState<cocoSsd.DetectedObject>()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [currentDetected, setCurrentDetected] = useState('none')
+  const [isVideoOK, setIsVideoOK] = useState(false)
+  let model: cocoSsd.ObjectDetection | null = null
 
   const initTensorflow = async () => {
     model = await cocoSsd.load()
   }
 
-  const recognizeObject = async () => {
-    if (videoRef.current && model) {
+  const recognizeObject = useCallback(async () => {
+    if (videoRef.current && model && isVideoOK) {
       const prediction = await model.detect(videoRef.current)
       if (prediction.length > 0) {
-        setCurrentDetected(prediction[0])
+        setCurrentDetected(prediction[0].class)
       }
     }
-  }
+    requestAnimationFrame(() => recognizeObject())
+  }, [])
 
   const handleVideoInit = async () => {
     const video = await navigator.mediaDevices.getUserMedia({
@@ -61,8 +94,10 @@ const Index = (): React.ReactElement => {
 
     if (videoRef.current) {
       videoRef.current.srcObject = video
-      videoRef.current.addEventListener('loadedmetadata', event => {
+      videoRef.current.addEventListener('loadeddata', event => {
         (event.target as HTMLVideoElement).play()
+        setIsVideoOK(true)
+        requestAnimationFrame(() => recognizeObject())
       })
     }
   }
@@ -70,15 +105,17 @@ const Index = (): React.ReactElement => {
   useEffect(() => {
     handleVideoInit()
     initTensorflow()
-  }, [videoRef.current])
+  }, [])
 
   return (
     <Container>
       <FeedContainer>
         <video ref={videoRef} />
       </FeedContainer>
-      <h1>Detected: { currentDetected?.class ?? 'None'}</h1>
-      <button onClick={recognizeObject}>Check</button>
+      <CatStatus>
+        <CatLabel>Cat?</CatLabel>
+        <CatConfirmation isOK={currentDetected === 'cat' ?? false}>{currentDetected === 'cat' ? 'Yes!' : 'No'}</CatConfirmation>
+      </CatStatus>
     </Container>
   )
 }
