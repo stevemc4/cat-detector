@@ -1,5 +1,9 @@
-import React, { useEffect, createRef } from 'react'
+import '@tensorflow/tfjs-backend-cpu'
+import '@tensorflow/tfjs-backend-webgl'
+
+import React, { useEffect, useState, createRef } from 'react'
 import styled from 'styled-components'
+import * as cocoSsd from '@tensorflow-models/coco-ssd'
 
 const Container = styled.div`
   max-width: 960px;
@@ -27,9 +31,24 @@ const FeedContainer = styled.div`
     object-fit: cover;
   }
 `
+let model: cocoSsd.ObjectDetection | null = null
 
 const Index = (): React.ReactElement => {
   const videoRef = createRef<HTMLVideoElement>()
+  const [currentDetected, setCurrentDetected] = useState<cocoSsd.DetectedObject>()
+
+  const initTensorflow = async () => {
+    model = await cocoSsd.load()
+  }
+
+  const recognizeObject = async () => {
+    if (videoRef.current && model) {
+      const prediction = await model.detect(videoRef.current)
+      if (prediction.length > 0) {
+        setCurrentDetected(prediction[0])
+      }
+    }
+  }
 
   const handleVideoInit = async () => {
     const video = await navigator.mediaDevices.getUserMedia({
@@ -39,6 +58,7 @@ const Index = (): React.ReactElement => {
         }
       }
     })
+
     if (videoRef.current) {
       videoRef.current.srcObject = video
       videoRef.current.addEventListener('loadedmetadata', event => {
@@ -46,8 +66,10 @@ const Index = (): React.ReactElement => {
       })
     }
   }
+
   useEffect(() => {
     handleVideoInit()
+    initTensorflow()
   }, [videoRef.current])
 
   return (
@@ -55,7 +77,8 @@ const Index = (): React.ReactElement => {
       <FeedContainer>
         <video ref={videoRef} />
       </FeedContainer>
-      <p>Hello World</p>
+      <h1>Detected: { currentDetected?.class ?? 'None'}</h1>
+      <button onClick={recognizeObject}>Check</button>
     </Container>
   )
 }
