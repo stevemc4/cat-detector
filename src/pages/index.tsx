@@ -10,6 +10,7 @@ const Container = styled.div`
   margin: 0px auto;
   box-sizing: border-box;
   min-height: 100vh;
+  position: relative;
 `
 
 const FeedContainer = styled.div`
@@ -63,11 +64,13 @@ const CatConfirmation = styled(CatLabel)<CatConfirmationProps>`
   `}
 `
 
+let model: cocoSsd.ObjectDetection | null = null
+
 const Index = (): React.ReactElement => {
-  const videoRef = useRef<HTMLVideoElement>(null)
   const [currentDetected, setCurrentDetected] = useState('none')
+
+  const videoRef = useRef<HTMLVideoElement>(null)
   const animationRef = useRef(0)
-  let model: cocoSsd.ObjectDetection | null = null
 
   const initTensorflow = async () => {
     model = await cocoSsd.load()
