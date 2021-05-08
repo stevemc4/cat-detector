@@ -1,7 +1,7 @@
 import '@tensorflow/tfjs-backend-cpu'
 import '@tensorflow/tfjs-backend-webgl'
 
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import styled, { css } from 'styled-components'
 import * as cocoSsd from '@tensorflow-models/coco-ssd'
 
@@ -10,6 +10,7 @@ const Container = styled.div`
   margin: 0px auto;
   box-sizing: border-box;
   min-height: 100vh;
+  position: relative;
 `
 
 const FeedContainer = styled.div`
@@ -63,25 +64,27 @@ const CatConfirmation = styled(CatLabel)<CatConfirmationProps>`
   `}
 `
 
+let model: cocoSsd.ObjectDetection | null = null
+
 const Index = (): React.ReactElement => {
-  const videoRef = useRef<HTMLVideoElement>(null)
   const [currentDetected, setCurrentDetected] = useState('none')
-  const [isVideoOK, setIsVideoOK] = useState(false)
-  let model: cocoSsd.ObjectDetection | null = null
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const animationRef = useRef(0)
 
   const initTensorflow = async () => {
     model = await cocoSsd.load()
   }
 
-  const recognizeObject = useCallback(async () => {
-    if (videoRef.current && model && isVideoOK) {
+  const recognizeObject = async () => {
+    if (videoRef.current && model) {
       const prediction = await model.detect(videoRef.current)
       if (prediction.length > 0) {
         setCurrentDetected(prediction[0].class)
       }
     }
-    requestAnimationFrame(() => recognizeObject())
-  }, [])
+    animationRef.current = requestAnimationFrame(recognizeObject)
+  }
 
   const handleVideoInit = async () => {
     const video = await navigator.mediaDevices.getUserMedia({
@@ -96,8 +99,7 @@ const Index = (): React.ReactElement => {
       videoRef.current.srcObject = video
       videoRef.current.addEventListener('loadeddata', event => {
         (event.target as HTMLVideoElement).play()
-        setIsVideoOK(true)
-        requestAnimationFrame(() => recognizeObject())
+        animationRef.current = requestAnimationFrame(recognizeObject)
       })
     }
   }
@@ -105,6 +107,10 @@ const Index = (): React.ReactElement => {
   useEffect(() => {
     handleVideoInit()
     initTensorflow()
+
+    return (): void => {
+      cancelAnimationFrame(animationRef.current)
+    }
   }, [])
 
   return (
